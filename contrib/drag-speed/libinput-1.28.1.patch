@@ -1,0 +1,80 @@
+--- a/src/evdev-mt-touchpad.h
++++ b/src/evdev-mt-touchpad.h
+@@ -452,6 +452,7 @@
+ 		struct libinput_device_config_3fg_drag config;
+ 		size_t nfingers;
+ 		size_t want_nfingers;
++		double local_speed;
+ 	} drag_3fg;
+ 
+ 	struct {
+--- a/src/evdev-mt-touchpad-gestures.c
++++ b/src/evdev-mt-touchpad-gestures.c
+@@ -27,6 +27,7 @@
+ #include <stdbool.h>
+ 
+ #include "evdev-mt-touchpad.h"
++#include "local-drag-speed.h"
+ 
+ enum gesture_cancelled {
+ 	END_GESTURE = 0,
+@@ -214,6 +215,9 @@
+ 		struct device_float_coords unaccel;
+ 
+ 		unaccel = tp_scale_to_xaxis(tp, raw);
++		local_drag_speed_scale(tp->gesture.state == GESTURE_STATE_3FG_DRAG,
++		                       tp->drag_3fg.local_speed,
++		                       &delta.x, &delta.y, &unaccel.x, &unaccel.y);
+ 		pointer_notify_motion(&tp->device->base,
+ 				      time,
+ 				      &delta,
+@@ -1707,6 +1711,7 @@
+ static void
+ tp_gesture_handle_state_3fg_drag_start(struct tp_dispatch *tp, uint64_t time)
+ {
++	tp->drag_3fg.local_speed = local_drag_speed_read();
+ 	evdev_pointer_notify_button(tp->device,
+ 				    time,
+ 				    BTN_LEFT,
+--- /dev/null
++++ b/src/local-drag-speed.h
+@@ -0,0 +1,39 @@
++/* Local extension: read the drag-only multiplier once at gesture start. */
++#ifndef LOCAL_DRAG_SPEED_H
++#define LOCAL_DRAG_SPEED_H
++#include <math.h>
++#include <stdbool.h>
++#include <stdio.h>
++#include <stdlib.h>
++
++static inline double
++local_drag_speed_read(void)
++{
++    const char *path = getenv("THREE_FINGER_DRAG_SPEED_FILE");
++    if (!path || !*path)
++        return 1.0;
++    FILE *file = fopen(path, "re");
++    if (!file)
++        return 1.0;
++    double speed = 1.0;
++    char extra;
++    int fields = fscanf(file, "%lf %c", &speed, &extra);
++    fclose(file);
++    if (fields != 1 || !isfinite(speed) || speed < 0.1 || speed > 1.0)
++        return 1.0;
++    return speed;
++}
++
++static inline void
++local_drag_speed_scale(bool dragging, double speed,
++                      double *dx, double *dy,
++                      double *raw_dx, double *raw_dy)
++{
++    if (!dragging)
++        return;
++    *dx *= speed;
++    *dy *= speed;
++    *raw_dx *= speed;
++    *raw_dy *= speed;
++}
++#endif

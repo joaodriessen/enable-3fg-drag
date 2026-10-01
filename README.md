@@ -153,6 +153,13 @@ shim: just `./uninstall.sh` and flip the real setting.
   feature). If it bothers you, adjust your compositor's 3-finger swipe
   binding; four-finger gestures are unaffected.
 
+## Experimental drag-only speed control
+
+An optional [libinput 1.28.1 companion patch](contrib/drag-speed/README.md)
+adds a drag-only speed multiplier while preserving ordinary pointer speed.
+It requires a private libinput build and maintenance after package updates;
+the normal installer and stock libinput do not expose this setting.
+
 ## Relationship to other projects
 
 For KDE's hardcoded-3-finger-swipe problem, there are heavier userspace
